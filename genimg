@@ -1,0 +1,26 @@
+#!/bin/sh -eux
+
+cleanup() {
+	sync || true
+	umount /mnt || true
+	settrans -fg /dev/loop0s1 || true
+	settrans -fg /dev/loop0 || true
+}
+trap cleanup EXIT
+
+rm -f disk.img
+truncate -s 50M disk.img
+
+# Create translator for file
+settrans -ca /dev/loop0 /hurd/storeio -T file disk.img
+
+# Partition setup
+parted -a optimal -s /dev/loop0 mklabel msdos
+parted -a optimal -s /dev/loop0 -- mkpart primary ext2 32256B -1
+parted -a optimal -s /dev/loop0 -- set 1 boot on
+# Create translator for partition
+settrans -ca /dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
+
+mkfs.ext2 -o hurd -m 1 -v /dev/loop0s1
+mount -t ext2 /dev/loop0s1 /mnt
+grub-install --target=i386-pc --boot-directory=/mnt/boot /dev/loop0
