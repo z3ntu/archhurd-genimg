@@ -2,14 +2,16 @@
 
 cleanup() {
 	sync || true
-	umount /mnt || true
+	settrans -gR /mnt || true
 	settrans -fg /dev/loop0s1 || true
 	settrans -fg /dev/loop0 || true
 }
 trap cleanup EXIT
 
 rm -f disk.img
-truncate -s 50M disk.img
+# 800M seems to be enough for Arch
+dd if=/dev/zero of=disk.img bs=1024K count=80
+#truncate -s 80M disk.img
 
 # Create translator for file
 settrans -ca /dev/loop0 /hurd/storeio -T file disk.img
@@ -23,4 +25,18 @@ settrans -ca /dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
 
 mkfs.ext2 -o hurd -m 1 -v /dev/loop0s1
 mount -t ext2 /dev/loop0s1 /mnt
+
+# Install GRUB
+#mkdir -p /mnt/boot/grub
+#cat > /mnt/boot/grub/device.map <<EOF
+#(hd0)   /dev/loop0
+#EOF
 grub-install --target=i386-pc --boot-directory=/mnt/boot /dev/loop0
+
+mkdir -p /mnt/servers/socket
+mkdir -p /mnt/dev
+settrans -c /mnt/servers/socket/1 /hurd/pflocal
+settrans -c /mnt/dev/null /hurd/null
+
+#pacstrap /mnt --needed base grub vim
+
