@@ -2,6 +2,7 @@
 
 cleanup() {
 	sync || true
+	rm -rf grub/ || true
 	settrans -gR /mnt || true
 	settrans -fg /dev/loop0s1 || true
 	settrans -fg /dev/loop0 || true
@@ -10,7 +11,7 @@ trap cleanup EXIT
 
 rm -f disk.img
 # 800M seems to be enough for Arch
-dd if=/dev/zero of=disk.img bs=1024K count=800
+dd if=/dev/zero of=disk.img bs=1024K count=50
 #truncate -s 800M disk.img
 
 # Create translator for file
@@ -22,8 +23,7 @@ parted -a optimal -s /dev/loop0 -- mkpart primary ext2 32256B -1
 parted -a optimal -s /dev/loop0 -- set 1 boot on
 
 # Create translator for partition
-#settrans -ca /dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
-settrans -ca /dev/loop0s1 /hurd/storeio -T typed remap:32256:file:disk.img
+settrans -ca /dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
 
 mkfs.ext2 /dev/loop0s1
 mount -t ext2 /dev/loop0s1 /mnt
@@ -34,7 +34,7 @@ mkdir -p /mnt/dev
 settrans -c /mnt/servers/socket/1 /hurd/pflocal
 settrans -c /mnt/dev/null /hurd/null
 
-pacstrap /mnt --needed base grub
+#pacstrap /mnt --needed base grub
 
 run_root() {
         chroot /mnt /usr/bin/env \
@@ -42,12 +42,13 @@ run_root() {
                 /bin/sh -c "$*"
 }
 
-settrans -cgap /mnt/dev/loop0 /hurd/storeio -T typed file:disk.img
-#settrans -cgap /mnt/dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
-settrans -cgap /mnt/dev/loop0s1 /hurd/storeio -T typed remap:63:file:disk.img
-
-#mkdir -p /mnt/boot/grub
-#cat > /mnt/boot/grub/device.map <<EOF
-#(hd0,1) /dev/loop0s1
-#EOF
-run_root grub-install --target=i386-pc /dev/loop0
+# Install GRUB
+# It's done manually as grub-install doesn't seem to like "loop" devices on the Hurd
+mkdir grub/
+# Copy boot.img
+cp /usr/lib/grub/i386-pc/boot.img grub/
+# Generate core.img
+grub-mkimage -O i386-pc -o grub/core.img -d /usr/lib/grub/i386-pc -p '(hd0,msdos1)/grub' biosdisk part_msdos ext2
+# Install images to disk
+grub-bios-setup -d grub/ /dev/loop0
+#dd if=grub/boot.img of=/dev/loop0 bs=1 count=440
