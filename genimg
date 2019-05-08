@@ -2,7 +2,6 @@
 
 cleanup() {
 	sync || true
-	rm -rf grub/ || true
 	settrans -gR /mnt || true
 	settrans -fg /dev/loop0s1 || true
 	settrans -fg /dev/loop0 || true
@@ -11,8 +10,7 @@ trap cleanup EXIT
 
 rm -f disk.img
 # 800M seems to be enough for Arch
-dd if=/dev/zero of=disk.img bs=1024K count=50
-#truncate -s 800M disk.img
+truncate -s 50M disk.img
 
 # Create translator for file
 settrans -ca /dev/loop0 /hurd/storeio -T typed file:disk.img
@@ -25,6 +23,7 @@ parted -a optimal -s /dev/loop0 -- set 1 boot on
 # Create translator for partition
 settrans -ca /dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
 
+# Format as ext2 and mount
 mkfs.ext2 /dev/loop0s1
 mount -t ext2 /dev/loop0s1 /mnt
 
@@ -44,14 +43,9 @@ run_root() {
 
 # Install GRUB
 # It's done manually as grub-install doesn't seem to like "loop" devices on the Hurd
-mkdir grub/
-# Copy boot.img
-cp /usr/lib/grub/i386-pc/boot.img grub/
-# Generate core.img
-grub-mkimage -O i386-pc -o grub/core.img -d /usr/lib/grub/i386-pc -p '(hd0,msdos1)/boot/grub' biosdisk part_msdos ext2
-# Install images to disk
-grub-bios-setup -d grub/ /dev/loop0
-
-# Copy GRUB files
 mkdir -p /mnt/boot/grub/i386-pc
 cp /usr/lib/grub/i386-pc/* /mnt/boot/grub/i386-pc/
+# Generate core.img
+grub-mkimage -O i386-pc -o /mnt/boot/grub/i386-pc/core.img -d /mnt/boot/grub/i386-pc -p '(hd0,msdos1)/boot/grub' biosdisk part_msdos ext2
+# Install images to disk
+grub-bios-setup -d /mnt/boot/grub/i386-pc /dev/loop0
