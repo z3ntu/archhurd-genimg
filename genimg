@@ -10,33 +10,44 @@ trap cleanup EXIT
 
 rm -f disk.img
 # 800M seems to be enough for Arch
-dd if=/dev/zero of=disk.img bs=1024K count=80
-#truncate -s 80M disk.img
+dd if=/dev/zero of=disk.img bs=1024K count=800
+#truncate -s 800M disk.img
 
 # Create translator for file
-settrans -ca /dev/loop0 /hurd/storeio -T file disk.img
+settrans -ca /dev/loop0 /hurd/storeio -T typed file:disk.img
 
 # Partition setup
-parted -a optimal -s /dev/loop0 mklabel msdos
+parted -a optimal -s /dev/loop0 -- mklabel msdos
 parted -a optimal -s /dev/loop0 -- mkpart primary ext2 32256B -1
 parted -a optimal -s /dev/loop0 -- set 1 boot on
-# Create translator for partition
-settrans -ca /dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
 
-mkfs.ext2 -o hurd -m 1 -v /dev/loop0s1
+# Create translator for partition
+#settrans -ca /dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
+settrans -ca /dev/loop0s1 /hurd/storeio -T typed remap:32256:file:disk.img
+
+mkfs.ext2 /dev/loop0s1
 mount -t ext2 /dev/loop0s1 /mnt
 
-# Install GRUB
-#mkdir -p /mnt/boot/grub
-#cat > /mnt/boot/grub/device.map <<EOF
-#(hd0)   /dev/loop0
-#EOF
-grub-install --target=i386-pc --boot-directory=/mnt/boot /dev/loop0
-
+# Set up some tranlsators for the new image
 mkdir -p /mnt/servers/socket
 mkdir -p /mnt/dev
 settrans -c /mnt/servers/socket/1 /hurd/pflocal
 settrans -c /mnt/dev/null /hurd/null
 
-#pacstrap /mnt --needed base grub vim
+pacstrap /mnt --needed base grub
 
+run_root() {
+        chroot /mnt /usr/bin/env \
+                PATH=/sbin:/usr/sbin:/bin:/usr/bin \
+                /bin/sh -c "$*"
+}
+
+settrans -cgap /mnt/dev/loop0 /hurd/storeio -T typed file:disk.img
+#settrans -cgap /mnt/dev/loop0s1 /hurd/storeio -T typed part:1:file:disk.img
+settrans -cgap /mnt/dev/loop0s1 /hurd/storeio -T typed remap:63:file:disk.img
+
+#mkdir -p /mnt/boot/grub
+#cat > /mnt/boot/grub/device.map <<EOF
+#(hd0,1) /dev/loop0s1
+#EOF
+run_root grub-install --target=i386-pc /dev/loop0
