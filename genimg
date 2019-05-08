@@ -9,8 +9,8 @@ cleanup() {
 trap cleanup EXIT
 
 rm -f disk.img
-# 800M seems to be enough for Arch
-truncate -s 50M disk.img
+# 900M seems to be enough for Arch
+truncate -s 900M disk.img
 
 # Create translator for file
 settrans -ca /dev/loop0 /hurd/storeio -T typed file:disk.img
@@ -33,7 +33,7 @@ mkdir -p /mnt/dev
 settrans -c /mnt/servers/socket/1 /hurd/pflocal
 settrans -c /mnt/dev/null /hurd/null
 
-#pacstrap /mnt --needed base grub
+pacstrap /mnt --needed base grub vim openrc dde netdde
 
 run_root() {
         chroot /mnt /usr/bin/env \
@@ -49,3 +49,6 @@ cp /usr/lib/grub/i386-pc/* /mnt/boot/grub/i386-pc/
 grub-mkimage -O i386-pc -o /mnt/boot/grub/i386-pc/core.img -d /mnt/boot/grub/i386-pc -p '(hd0,msdos1)/boot/grub' biosdisk part_msdos ext2
 # Install images to disk
 grub-bios-setup -d /mnt/boot/grub/i386-pc /dev/loop0
+
+run_root grub-mkconfig -o /boot/grub/grub.cfg
+run_root sed -i 's|loop0s1|hd0s1|g' /boot/grub/grub.cfg
