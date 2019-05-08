@@ -48,7 +48,10 @@ mkdir grub/
 # Copy boot.img
 cp /usr/lib/grub/i386-pc/boot.img grub/
 # Generate core.img
-grub-mkimage -O i386-pc -o grub/core.img -d /usr/lib/grub/i386-pc -p '(hd0,msdos1)/grub' biosdisk part_msdos ext2
+grub-mkimage -O i386-pc -o grub/core.img -d /usr/lib/grub/i386-pc -p '(hd0,msdos1)/boot/grub' biosdisk part_msdos ext2
 # Install images to disk
 grub-bios-setup -d grub/ /dev/loop0
-#dd if=grub/boot.img of=/dev/loop0 bs=1 count=440
+
+# Copy GRUB files
+mkdir -p /mnt/boot/grub/i386-pc
+cp /usr/lib/grub/i386-pc/* /mnt/boot/grub/i386-pc/
