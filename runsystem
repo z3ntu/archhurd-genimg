@@ -1,0 +1,92 @@
+#!/bin/sh
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+
+umask 022
+
+# These are needed very early
+mkdir -p /servers/socket
+settrans -c /servers/socket/1 /hurd/pflocal
+settrans -c /dev/null /hurd/null
+
+#mem=`vmstat-hurd --size -k`
+#if [ "$mem" -lt 240000 ]
+#then
+#	echo "You only have ${mem}KiB memory."
+#	echo "Debian GNU/Hurd installation has not been optimized for memory usage yet, and thus currently needs at least 512MiB memory, sorry."
+#	while true
+#	do
+#		sleep 60
+#	done
+#fi
+
+# Create a minimal subset of device and server nodes
+date > /var/lib/random-seed 2> /dev/null
+/usr/lib/hurd/setup-translators -m -k -p
+settrans -c /proc /hurd/procfs -c
+
+/hurd/mach-defpager
+
+# Get all kernel parameters that can be exported as environment variables
+envvars="$(echo $* | tr ' ' '\012' | egrep '^[-_/[:alnum:]]+=.*$')"
+
+# Invoke init as linuxrc to work around pid != 1
+init='/bin/init'
+
+# Parse kernel parameters
+for i in $envvars ; do
+    case "$i" in
+        init="/sbin/init"|init="init")
+            # Avoid endless loop
+            : ;;
+        init=*)
+            init=${i#init=}
+            ;;
+        noshell=*)
+            sed -i '/^tty[12]/s/^/#/' /etc/inittab
+            ;;
+        TERM=*)
+            term=yes
+            ;;
+        VGA_OPTIONS=*)
+            VGA_OPTIONS=${i#VGA_OPTIONS=}
+            ;;
+    esac
+done
+
+#if [ "$term" != yes ]
+#then
+#        # No terminal type set, assume we can start the Hurd console
+#
+#        # Touch the first tty so that the Hurd console is certain to pick it
+#        # and not some random other tty.
+#        sleep 1
+#        touch /dev/tty1
+#
+#        echo -n "Starting the Hurd console..."
+#	while true
+#	do
+#		LAYOUT=""
+#		if [ -f /etc/default/keyboard ]
+#		then
+#			. /etc/default/keyboard
+#			[ -z "$XKBLAYOUT" ] || LAYOUT="--keymap $XKBLAYOUT"
+#		fi
+#		console -d vga -g $VGA_OPTIONS -d pc_kbd --repeat=kbd $LAYOUT -d pc_mouse --repeat=mouse -c /dev/vcs &
+#		echo $! > /var/run/hurd-console.pid
+#		wait
+#		echo
+#		echo -n "Restarting the Hurd console..."
+#	done &
+#
+#        # Switch over
+#        envvars="$envvars TERM=hurd"
+#        exec < /dev/tty1 > /dev/tty1 2>&1
+#        echo "Console started"
+#
+#        # Set the console device used by /sbin/reopen-console
+#        echo /dev/tty1 >/var/run/console-device
+#fi
+
+eval exec env - $envvars $init

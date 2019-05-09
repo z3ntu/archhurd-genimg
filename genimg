@@ -49,6 +49,15 @@ cp /usr/lib/grub/i386-pc/* /mnt/boot/grub/i386-pc/
 grub-mkimage -O i386-pc -o /mnt/boot/grub/i386-pc/core.img -d /mnt/boot/grub/i386-pc -p '(hd0,msdos1)/boot/grub' biosdisk part_msdos ext2
 # Install images to disk
 grub-bios-setup -d /mnt/boot/grub/i386-pc /dev/loop0
-
+# Generate and fix up GRUB config
 run_root grub-mkconfig -o /boot/grub/grub.cfg
-run_root sed -i 's|loop0s1|hd0s1|g' /boot/grub/grub.cfg
+sed -i 's|loop0s1|hd0s1|g' /mnt/boot/grub/grub.cfg
+
+# Install some extra files
+cp -v fstab /etc/
+cp -v runsystem /mnt/usr/lib/
+cp -v hurd-console /mnt/etc/init.d/
+run_root rc-update add hurd-console default
+patch -N -i ./etc_init.d_root.diff /mnt/etc/init.d/root
+
+run_root "cd /dev && MAKEDEV console"
