@@ -55,38 +55,38 @@ for i in $envvars ; do
     esac
 done
 
-#if [ "$term" != yes ]
-#then
-#        # No terminal type set, assume we can start the Hurd console
-#
-#        # Touch the first tty so that the Hurd console is certain to pick it
-#        # and not some random other tty.
-#        sleep 1
-#        touch /dev/tty1
-#
-#        echo -n "Starting the Hurd console..."
-#	while true
-#	do
-#		LAYOUT=""
-#		if [ -f /etc/default/keyboard ]
-#		then
-#			. /etc/default/keyboard
-#			[ -z "$XKBLAYOUT" ] || LAYOUT="--keymap $XKBLAYOUT"
-#		fi
-#		console -d vga -g $VGA_OPTIONS -d pc_kbd --repeat=kbd $LAYOUT -d pc_mouse --repeat=mouse -c /dev/vcs &
-#		echo $! > /var/run/hurd-console.pid
-#		wait
-#		echo
-#		echo -n "Restarting the Hurd console..."
-#	done &
-#
-#        # Switch over
-#        envvars="$envvars TERM=hurd"
-#        exec < /dev/tty1 > /dev/tty1 2>&1
-#        echo "Console started"
-#
-#        # Set the console device used by /sbin/reopen-console
-#        echo /dev/tty1 >/var/run/console-device
-#fi
+if [ "$term" != yes ]
+then
+        # No terminal type set, assume we can start the Hurd console
+
+        # Touch the first tty so that the Hurd console is certain to pick it
+        # and not some random other tty.
+        sleep 1
+        touch /dev/tty1
+
+        echo -n "Starting the Hurd console..."
+	while true
+	do
+		LAYOUT=""
+		if [ -f /etc/default/keyboard ]
+		then
+			. /etc/default/keyboard
+			[ -z "$XKBLAYOUT" ] || LAYOUT="--keymap $XKBLAYOUT"
+		fi
+		console -d vga -g $VGA_OPTIONS -d pc_kbd --repeat=kbd $LAYOUT -d pc_mouse --repeat=mouse -c /dev/vcs &
+		echo $! > /var/run/hurd-console.pid
+		wait
+		echo
+		echo -n "Restarting the Hurd console..."
+	done &
+
+        # Switch over
+        envvars="$envvars TERM=hurd"
+        exec < /dev/tty1 > /dev/tty1 2>&1
+        echo "Console started"
+
+        # Set the console device used by /sbin/reopen-console
+        echo /dev/tty1 >/var/run/console-device
+fi
 
 eval exec env - $envvars $init
